@@ -1,0 +1,273 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>IESCO High Loss Feeders – AMI Progress Monitoring</title>
+  <meta name="description" content="Official AMI Operation Center dashboard for High Loss Feeder meter installation, commissioning and data verification – IESCO" />
+  <link rel="stylesheet" href="style.css" />
+  <!-- Chart.js CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+</head>
+<body>
+
+  <!-- Loading overlay -->
+  <div id="loadingOverlay" class="loading-overlay" style="display:none;">
+    <div class="spinner"></div>
+  </div>
+
+  <!-- ========== HEADER ========== -->
+  <header class="dashboard-header">
+    <div class="header-inner">
+      <div class="header-brand">
+        <div class="header-logo">IESCO</div>
+        <div class="header-titles">
+          <h1>IESCO HIGH LOSS FEEDERS – AMI PROGRESS MONITORING</h1>
+          <p>AMI Operation Center | Meter Installation, Commissioning &amp; Data Verification</p>
+        </div>
+      </div>
+      <div class="header-meta">
+        <div class="live-badge">
+          <span class="live-dot"></span>
+          LIVE MONITORING
+        </div>
+        <div class="last-update">
+          Last Data Update: <strong id="lastUpdateText">—</strong>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <main class="container">
+
+    <!-- Error / Demo notices -->
+    <div id="errorBanner" class="error-banner"></div>
+    <div id="demoNotice" class="demo-notice">
+      <strong>Demo Mode:</strong> Google Sheet API URL not configured. Displaying sample data.
+      Configure <code>GOOGLE_SHEET_API_URL</code> in <code>script.js</code> for live data.
+    </div>
+
+    <!-- ========== KPI CARDS ========== -->
+    <section>
+      <h2 class="section-title">Overall Progress Snapshot</h2>
+      <div class="kpi-grid">
+        <div class="kpi-card">
+          <div class="kpi-label">Total High Loss Feeders</div>
+          <div class="kpi-value" id="kpiTotalFeeders">10</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-label">Total Records</div>
+          <div class="kpi-value" id="kpiTotalRecords">0</div>
+        </div>
+        <div class="kpi-card kpi-success">
+          <div class="kpi-label">Completed / Installed &amp; Commissioned</div>
+          <div class="kpi-value" id="kpiCompleted">0</div>
+        </div>
+        <div class="kpi-card kpi-warning">
+          <div class="kpi-label">Pending Data</div>
+          <div class="kpi-value" id="kpiPending">0</div>
+        </div>
+        <div class="kpi-card kpi-warning">
+          <div class="kpi-label">TR ID Pending</div>
+          <div class="kpi-value" id="kpiTrIdPending">0</div>
+        </div>
+        <div class="kpi-card kpi-warning">
+          <div class="kpi-label">T/F Capacity Pending</div>
+          <div class="kpi-value" id="kpiCapPending">0</div>
+        </div>
+        <div class="kpi-card kpi-danger">
+          <div class="kpi-label">Duplicate Reference No.</div>
+          <div class="kpi-value" id="kpiDupRef">0</div>
+        </div>
+        <div class="kpi-card kpi-danger">
+          <div class="kpi-label">Duplicate Meter No.</div>
+          <div class="kpi-value" id="kpiDupMeter">0</div>
+        </div>
+        <div class="kpi-card kpi-accent">
+          <div class="kpi-label">Overall Completion %</div>
+          <div class="kpi-value" id="kpiOverallPct">0%</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ========== FILTERS ========== -->
+    <section>
+      <div class="filters-panel">
+        <div class="filter-group">
+          <label for="filterDivision">Division</label>
+          <select id="filterDivision"><option value="">All</option></select>
+        </div>
+        <div class="filter-group">
+          <label for="filterSubDivision">Sub Division</label>
+          <select id="filterSubDivision"><option value="">All</option></select>
+        </div>
+        <div class="filter-group">
+          <label for="filterFeeder">Feeder</label>
+          <select id="filterFeeder"><option value="">All</option></select>
+        </div>
+        <div class="filter-group">
+          <label for="filterStatus">Status</label>
+          <select id="filterStatus">
+            <option value="">All</option>
+            <option value="Completed">Completed</option>
+            <option value="Pending Data">Pending Data</option>
+            <option value="TR ID Pending">TR ID Pending</option>
+            <option value="Capacity Pending">Capacity Pending</option>
+            <option value="Duplicate Reference">Duplicate Reference</option>
+            <option value="Duplicate Meter">Duplicate Meter</option>
+            <option value="Duplicate Record">Duplicate Record</option>
+            <option value="Other Issue">Other Issue</option>
+          </select>
+        </div>
+        <div class="filter-group">
+          <label for="filterDateFrom">Install Date From</label>
+          <input type="date" id="filterDateFrom" />
+        </div>
+        <div class="filter-group">
+          <label for="filterDateTo">Install Date To</label>
+          <input type="date" id="filterDateTo" />
+        </div>
+        <button class="btn btn-outline" id="btnResetFilters">Reset Filters</button>
+        <button class="btn btn-primary" id="btnRefresh">↻ Refresh Data</button>
+      </div>
+    </section>
+
+    <!-- ========== FEEDER-WISE PROGRESS ========== -->
+    <section>
+      <h2 class="section-title">Feeder-wise Progress (All 10 High Loss Feeders)</h2>
+      <div class="card">
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Division</th>
+                <th>Sub Division</th>
+                <th>Feeder</th>
+                <th>Total</th>
+                <th>Completed</th>
+                <th>Pending</th>
+                <th>TR ID Pending</th>
+                <th>Capacity Pending</th>
+                <th>Duplicates</th>
+                <th>Progress %</th>
+              </tr>
+            </thead>
+            <tbody id="feederTableBody">
+              <!-- populated by JS -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- ========== PENDING DATA FROM SUBDIVISIONS ========== -->
+    <section>
+      <h2 class="section-title">Pending Data from Subdivisions</h2>
+      <div class="card pending-highlight">
+        <div class="card-header">
+          <strong>Action Required – Subdivisions with incomplete / missing information</strong>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Division</th>
+                <th>Sub Division</th>
+                <th>Feeder</th>
+                <th>Total Pending</th>
+                <th>Missing TR ID</th>
+                <th>Missing T/F Capacity</th>
+                <th>Duplicate Reference No.</th>
+                <th>Duplicate Meter No.</th>
+                <th>Other Issues</th>
+              </tr>
+            </thead>
+            <tbody id="pendingSubTableBody">
+              <!-- populated by JS -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- ========== VISUAL ANALYTICS ========== -->
+    <section>
+      <h2 class="section-title">Visual Analytics</h2>
+      <div class="charts-grid">
+        <div class="chart-card">
+          <h3>Feeder-wise Progress – Completed vs Pending</h3>
+          <div class="chart-container">
+            <canvas id="chartFeederProgress"></canvas>
+          </div>
+        </div>
+        <div class="chart-card">
+          <h3>Pending Data Classification</h3>
+          <div class="chart-container">
+            <canvas id="chartPendingClass"></canvas>
+          </div>
+        </div>
+        <div class="chart-card">
+          <h3>Division-wise Progress</h3>
+          <div class="chart-container">
+            <canvas id="chartDivision"></canvas>
+          </div>
+        </div>
+        <div class="chart-card">
+          <h3>Installation Trend by Date</h3>
+          <div class="chart-container">
+            <canvas id="chartTrend"></canvas>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ========== DETAILED RECORD TABLE ========== -->
+    <section>
+      <h2 class="section-title">Detailed Record-level Information</h2>
+      <div class="card">
+        <div class="table-toolbar">
+          <input type="search" id="searchInput" placeholder="Search across all columns…" />
+          <button class="btn btn-success" id="btnExportCSV">Export CSV</button>
+          <button class="btn btn-outline" id="btnExportExcel">Export Excel</button>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Sr. No.</th>
+                <th>Installation Date</th>
+                <th>Division</th>
+                <th>Sub Division</th>
+                <th>Feeder</th>
+                <th>TR ID</th>
+                <th>TR Capacity</th>
+                <th>Reference Number</th>
+                <th>New Meter No.</th>
+                <th>Ref No. Duplicate</th>
+                <th>Meter No. Duplicate</th>
+                <th>Status</th>
+                <th>Remarks</th>
+              </tr>
+            </thead>
+            <tbody id="detailTableBody">
+              <!-- populated by JS -->
+            </tbody>
+          </table>
+        </div>
+        <div class="pagination">
+          <div id="paginationControls"></div>
+          <div class="pagination-info" id="paginationInfo"></div>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <footer class="dashboard-footer">
+    AMI Operation Center · IESCO · High Loss Feeder Monitoring System<br />
+    Data source: Google Sheets · Dashboard refreshes automatically every 5 minutes
+  </footer>
+
+  <script src="script.js"></script>
+</body>
+</html>
